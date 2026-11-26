@@ -241,7 +241,7 @@ final class Plugin
         return $response;
     }
 
-    /** On the purchase confirmation page, ask the API (signed) whether a pending order was paid. */
+    /** On the purchase confirmation page, ask the API (signed) whether a pending order was paid and clear the cart when complete. */
     public static function check_on_return()
     {
         if (!function_exists('edd_is_success_page') || !edd_is_success_page() || empty($_GET['payment_key'])) {
@@ -249,8 +249,14 @@ final class Plugin
         }
         $order_id = edd_get_purchase_id_by_key(sanitize_text_field(wp_unslash($_GET['payment_key'])));
         $order = $order_id ? edd_get_order($order_id) : null;
-        if ($order && self::GATEWAY === $order->gateway && 'pending' === $order->status) {
-            self::gateway()->reconcile((string) $order_id);
+        if ($order && self::GATEWAY === $order->gateway) {
+            if ('pending' === $order->status) {
+                self::gateway()->reconcile((string) $order_id);
+                $order = edd_get_order($order_id);
+            }
+            if ($order && in_array($order->status, array('complete', 'publish'), true) && function_exists('edd_empty_cart')) {
+                edd_empty_cart();
+            }
         }
     }
 
